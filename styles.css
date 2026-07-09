@@ -392,9 +392,7 @@ textarea:focus {
 
 .room-photo {
   min-height: 180px;
-  background:
-    linear-gradient(135deg, rgba(255, 132, 60, 0.72), rgba(255, 214, 134, 0.42)),
-    var(--photo);
+  background: var(--photo);
   background-position: center;
   background-size: cover;
 }
@@ -572,9 +570,7 @@ dialog::backdrop {
 
 .dialog-photo {
   min-height: 260px;
-  background:
-    linear-gradient(135deg, rgba(255, 132, 60, 0.68), rgba(255, 214, 134, 0.34)),
-    var(--photo);
+  background: var(--photo);
   background-position: center;
   background-size: cover;
 }
