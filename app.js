@@ -27,6 +27,7 @@ const defaultRooms = [
     electricity: "4.000đ/kWh",
     water: "100.000đ/người",
     serviceFee: "Wifi miễn phí",
+    parking: "Có chỗ để xe",
     maxPeople: 2,
     amenities: ["Máy lạnh", "Ban công", "Gác bếp", "Máy giặt chung"],
     description: "Phòng mới, gần trung tâm, phù hợp người đi làm cần không gian yên tĩnh.",
@@ -49,6 +50,7 @@ const defaultRooms = [
     electricity: "Theo đồng hồ",
     water: "100.000đ/người",
     serviceFee: "Dọn phòng hằng tuần",
+    parking: "Có bãi xe",
     maxPeople: 2,
     amenities: ["Dọn phòng", "Máy lạnh", "Cửa sổ", "Wifi riêng"],
     description: "Khu phố nhiều tiện ích, gần biển, có dịch vụ dọn phòng hằng tuần.",
@@ -71,6 +73,7 @@ const defaultRooms = [
     electricity: "4.000đ/kWh",
     water: "Theo đồng hồ",
     serviceFee: "100.000đ/tháng",
+    parking: "Hầm xe",
     maxPeople: 2,
     amenities: ["Thang máy", "Máy lạnh", "Nội thất", "Giờ tự do"],
     description: "Vị trí trung tâm, thuận tiện đi làm, ăn uống và di chuyển.",
@@ -93,6 +96,7 @@ const defaultRooms = [
     electricity: "3.800đ/kWh",
     water: "80.000đ/người",
     serviceFee: "Wifi 50.000đ/tháng",
+    parking: "Để xe miễn phí",
     maxPeople: 2,
     amenities: ["Gác lửng", "Giờ tự do", "Bếp riêng", "Chỗ để xe"],
     description: "Phòng sạch sẽ, chi phí hợp lý, thích hợp sinh viên hoặc người mới đi làm.",
@@ -184,8 +188,18 @@ function updateOwnerView() {
   renderRooms();
 }
 
+function getNumericPrice(value) {
+  if (typeof value === "number") return value;
+  const raw = String(value || "").trim();
+  if (!/^[\d\s.,]+$/.test(raw)) return null;
+  const number = Number(raw.replace(/[^\d]/g, ""));
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 function formatPrice(value) {
-  return new Intl.NumberFormat("vi-VN").format(value) + "đ";
+  const numericPrice = getNumericPrice(value);
+  if (numericPrice) return new Intl.NumberFormat("vi-VN").format(numericPrice) + "đ";
+  return String(value || "Liên hệ");
 }
 
 function normalizeText(value) {
@@ -258,20 +272,21 @@ function roomMatches(room) {
     room.amenities.join(" "),
   ].join(" "));
 
+  const numericPrice = getNumericPrice(room.price);
+
   return (isOwnerLoggedIn() || room.available)
     && (provinceFilter.value === "all" || room.province === provinceFilter.value)
     && (districtFilter.disabled || districtFilter.value === "all" || room.district === districtFilter.value)
     && (wardFilter.disabled || wardFilter.value === "all" || room.ward === wardFilter.value)
     && (typeFilter.value === "all" || room.type === typeFilter.value)
-    && room.price >= minPrice
-    && room.price <= maxPrice
+    && (priceFilter.value === "all" || (numericPrice !== null && numericPrice >= minPrice && numericPrice <= maxPrice))
     && searchable.includes(query);
 }
 
 function sortRooms(roomList) {
   return [...roomList].sort((a, b) => {
-    if (sortFilter.value === "price-asc") return a.price - b.price;
-    if (sortFilter.value === "price-desc") return b.price - a.price;
+    if (sortFilter.value === "price-asc") return (getNumericPrice(a.price) ?? Number.POSITIVE_INFINITY) - (getNumericPrice(b.price) ?? Number.POSITIVE_INFINITY);
+    if (sortFilter.value === "price-desc") return (getNumericPrice(b.price) ?? -1) - (getNumericPrice(a.price) ?? -1);
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 }
@@ -350,12 +365,13 @@ function showRoomDetail(roomId) {
       <div class="room-meta">
         <span class="pill">Trạng thái: ${room.status || "Còn trống"}</span>
         <span class="pill">Địa chỉ: ${room.address}</span>
-        <span class="pill">Diện tích: ${room.area}m2</span>
+        <span class="pill">Diện tích: ${room.area || "Liên hệ"}</span>
         <span class="pill">Cọc: ${room.deposit || "1 tháng"}</span>
         <span class="pill">Điện: ${room.electricity || "Liên hệ"}</span>
         <span class="pill">Nước: ${room.water || "Liên hệ"}</span>
         <span class="pill">Wifi/dịch vụ: ${room.serviceFee || "Liên hệ"}</span>
-        <span class="pill">Tối đa: ${room.maxPeople || "Liên hệ"} người</span>
+        <span class="pill">Xe: ${room.parking || "Liên hệ"}</span>
+        <span class="pill">Tối đa: ${room.maxPeople || "Liên hệ"}</span>
       </div>
       <div class="room-amenities">
         ${room.amenities.map((item) => `<span class="pill">${item}</span>`).join("")}
@@ -412,26 +428,29 @@ function fileToDataUrl(file) {
 }
 
 function getOwnerFormRoom(formData, existingRoom = {}) {
+  const field = (name, fallback = "") => String(formData.get(name) || "").trim() || fallback;
+
   return {
     id: existingRoom.id || `owner-${Date.now()}`,
-    title: formData.get("title").trim(),
-    province: formData.get("province").trim(),
-    district: formData.get("district").trim(),
-    ward: formData.get("ward").trim(),
-    address: formData.get("address").trim(),
-    type: formData.get("type").trim(),
-    price: Number(formData.get("price")),
-    area: Number(formData.get("area")),
+    title: field("title", "Phòng mới Troziee"),
+    province: field("province", "Chưa cập nhật"),
+    district: field("district", "Chưa cập nhật"),
+    ward: field("ward", "Chưa cập nhật"),
+    address: field("address", "Chưa cập nhật"),
+    type: field("type", "Phòng trọ"),
+    price: field("price", "Liên hệ"),
+    area: field("area", "Liên hệ"),
     available: existingRoom.available ?? formData.get("status") !== "Đã cho thuê",
     status: formData.get("status"),
-    deposit: formData.get("deposit").trim() || "1 tháng",
-    electricity: formData.get("electricity").trim(),
-    water: formData.get("water").trim(),
-    serviceFee: formData.get("serviceFee").trim(),
-    maxPeople: formData.get("maxPeople") || "",
-    sourceLink: formData.get("sourceLink").trim(),
+    deposit: field("deposit", "Liên hệ"),
+    electricity: field("electricity"),
+    water: field("water"),
+    serviceFee: field("serviceFee"),
+    parking: field("parking"),
+    maxPeople: field("maxPeople"),
+    sourceLink: field("sourceLink"),
     amenities: String(formData.get("amenities") || "").split(",").map((item) => item.trim()).filter(Boolean),
-    description: formData.get("description").trim() || "Phòng mới được TrozieVn cập nhật.",
+    description: field("description", "Phòng mới được TrozieVn cập nhật."),
     photo: existingRoom.photo,
     createdAt: existingRoom.createdAt || new Date().toISOString(),
   };
@@ -484,6 +503,7 @@ function editOwnerRoom(roomId) {
   ownerRoomForm.elements.electricity.value = room.electricity || "";
   ownerRoomForm.elements.water.value = room.water || "";
   ownerRoomForm.elements.serviceFee.value = room.serviceFee || "";
+  ownerRoomForm.elements.parking.value = room.parking || "";
   ownerRoomForm.elements.maxPeople.value = room.maxPeople || "";
   ownerRoomForm.elements.status.value = room.status || "Còn trống";
   ownerRoomForm.elements.sourceLink.value = room.sourceLink || "";
