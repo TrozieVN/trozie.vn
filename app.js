@@ -285,7 +285,7 @@ function renderRooms() {
   resultCount.textContent = `${filteredRooms.length} kết quả`;
 
   if (!filteredRooms.length) {
-    roomGrid.innerHTML = '<div class="empty">Chưa có phòng phù hợp bộ lọc. Hãy thử tỉnh thành hoặc mức giá khác.</div>';
+    roomGrid.innerHTML = '<div class="empty">Chưa có phòng phù hợp bộ lọc. Hãy thử tỉnh thành hoặc mức giá khác</div>';
     return;
   }
 
